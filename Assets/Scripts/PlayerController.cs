@@ -1,21 +1,26 @@
 using System;
+using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    private CardDeck _cardDeck;
+
     private Camera _camera;
     private LayerMask _layerMask;
     private Card _holdCard;
 
     private Vector3 _offset;
-    private Vector3 _prevScale;
+
+    public event Action<CardType, int> OnAddToMain;
+    public event Action<CardType, int> OnRemoveFromMain;
 
     private void Awake()
     {
         _camera = FindObjectOfType<Camera>();
         _layerMask = LayerMask.GetMask("Card");
+        _cardDeck = FindObjectOfType<CardDeck>();
     }
 
     private void Update()
@@ -45,8 +50,6 @@ public class PlayerController : MonoBehaviour
             {
                 _holdCard = card;
                 _holdCard.transform.Translate(Vector3.back * .5f, Space.World);
-                _prevScale = _holdCard.transform.localScale;
-                _holdCard.transform.localScale *= 1.1f;
 
                 Vector3 worldPosition = _camera.ScreenToWorldPoint(Input.mousePosition);
                 worldPosition.z = _holdCard.transform.position.z;
@@ -63,7 +66,7 @@ public class PlayerController : MonoBehaviour
 
     private void ReleaseCard()
     {
-        Ray ray = new Ray(_holdCard.transform.position, Vector3.fwd);
+        Ray ray = new Ray(_holdCard.transform.position, Vector3.forward);
 
         if(Physics.Raycast(ray, out RaycastHit hit, int.MaxValue, _layerMask))
         {
@@ -71,12 +74,34 @@ public class PlayerController : MonoBehaviour
             if(cardPlace != null)
             {
                 _holdCard.transform.position = cardPlace.transform.position + Vector3.back * .01f;
-                _holdCard.transform.localScale = _prevScale;
+
+                if (cardPlace.IsMain)
+                {
+                    OnAddToMain?.Invoke(_holdCard.Type, _holdCard.Value);
+                }
+
+                if (_holdCard.IsMain && !cardPlace.IsMain)
+                {
+                    OnRemoveFromMain?.Invoke(_holdCard.Type, _holdCard.Value);
+                }
+
+                if (_holdCard.IsInDeck)
+                {
+                    _cardDeck.ExcludeCurrentCard();
+                }
+
+                _holdCard.SetParent(cardPlace);
+            }
+            else
+            {
+                _holdCard.SetParent();
             }
         }
+        else
+        {
+            _holdCard.SetParent();
+        }
+
+        _holdCard = null;
     }
-
-    
-
-    
 }
